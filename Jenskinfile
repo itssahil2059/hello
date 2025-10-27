@@ -1,0 +1,70 @@
+pipeline {
+  agent any
+
+  environment {
+    DOCKER_IMAGE = "sahilsince2059/hello"          // <-- your Docker Hub repo
+    DOCKER_TAG   = "0.0.${BUILD_NUMBER}"
+    EC2_HOST     = "ec2-3-145-131-238.us-east-2.compute.amazonaws.com"  // <-- your EC2 DNS
+    EC2_USER     = "ubuntu"
+  }
+
+  options { timestamps() }
+
+  stages {
+
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Build JAR (Maven)') {
+      steps {
+        sh 'mvn -q -B -DskipTests package'
+      }
+    }
+
+    stage('Build Docker image') {
+      steps {
+        sh """
+          docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+          docker images | head
+        """
+      }
+    }
+
+    stage('Push to Docker Hub') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
+          sh """
+            echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
+            docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+            docker logout
+          """
+        }
+      }
+    }
+
+    stage('Deploy to EC2') {
+      steps {
+        sshagent(credentials: ['ec2-creds']) {
+          sh """
+            # stop old container if exists
+            ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} 'sudo docker rm -f hello || true'
+            # pull and run new one
+            ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} '
+              sudo docker pull ${DOCKER_IMAGE}:${DOCKER_TAG} &&
+              sudo docker run -d --name hello -p 9090:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}
+            '
+          """
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "Deployed: http://${env.EC2_HOST}:9090/"
+    }
+  }
+}
