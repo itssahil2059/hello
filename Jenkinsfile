@@ -1,19 +1,18 @@
 pipeline {
   agent any
 
+  // Make Jenkins export the tool env vars (JAVA_HOME, add mvn to PATH, etc.)
   tools {
     jdk   'JDK17'
     maven 'Maven3'
   }
 
+  // Ensure the shell has the standard macOS paths so Maven’s shell script can run uname/dirname, etc.
   environment {
-    // make docker & mvn visible to Jenkins
-    PATH = "/usr/local/bin:/opt/homebrew/bin:/Applications/Docker.app/Contents/Resources/bin:${env.PATH}"
+    PATH = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH}"
 
     DOCKER_IMAGE = "sahilsince2059/hello"
     DOCKER_TAG   = "0.0.${BUILD_NUMBER}"
-
-    // your EC2 details
     EC2_HOST     = "ec2-3-145-131-238.us-east-2.compute.amazonaws.com"
     EC2_USER     = "besahil"
   }
@@ -28,11 +27,12 @@ pipeline {
     stage('Verify tools') {
       steps {
         sh '''
-          echo "whoami: $(whoami)"
-          which mvn || true
-          mvn -v || true
-          which docker || true
-          docker version || true
+          echo "== whoami =="; whoami || true
+          echo "== PATH ==";    echo "$PATH"
+          echo "== JAVA_HOME =="; echo "${JAVA_HOME:-<empty>}"
+          echo "== java -version ==";  java -version || true
+          echo "== mvn -v ==";         mvn -v || true
+          echo "== docker version =="; docker version || true
         '''
       }
     }
