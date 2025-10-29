@@ -1,60 +1,39 @@
 pipeline {
   agent any
 
-  // Make Jenkins export the tool env vars (JAVA_HOME, add mvn to PATH, etc.)
-  tools {
-    jdk   'JDK17'
-    maven 'Maven3'
-  }
-
-  // Ensure the shell has the standard macOS paths so Maven’s shell script can run uname/dirname, etc.
   environment {
-    PATH = "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH}"
-
-    DOCKER_IMAGE = "sahilsince2059/hello"
-    DOCKER_TAG   = "0.0.${BUILD_NUMBER}"
-    EC2_HOST     = "ec2-3-145-131-238.us-east-2.compute.amazonaws.com"
-    EC2_USER     = "besahil"
+    APP_NAME   = 'hello'
+    IMAGE_TAG  = "0.0.${env.BUILD_NUMBER}"
+    REGISTRY   = 'docker.io'
+    DOCKER_IMG = "sahilsince2059/hello"
+    EC2_HOST   = "ec2-3-145-131-238.us-east-2.compute.amazonaws.com"
   }
 
-  options { timestamps() }
+  tools {
+    maven 'Maven3'
+    jdk   'JDK21'
+  }
 
   stages {
     stage('Checkout') {
-      steps { checkout scm }
-    }
-
-    stage('Verify tools') {
       steps {
-        sh '''
-          echo "== whoami =="; whoami || true
-          echo "== PATH ==";    echo "$PATH"
-          echo "== JAVA_HOME =="; echo "${JAVA_HOME:-<empty>}"
-          echo "== java -version ==";  java -version || true
-          echo "== mvn -v ==";         mvn -v || true
-          echo "== docker version =="; docker version || true
-        '''
+        git branch: 'main', url: 'https://github.com/itssahil2059/hello.git'
       }
     }
 
     stage('Build with Maven') {
-      steps { sh 'mvn -q -B -DskipTests package' }
-    }
-
-    stage('Build Docker Image') {
-      steps { sh 'docker build -t $DOCKER_IMAGE:$DOCKER_TAG .' }
-    }
-
-    stage('Push to DockerHub') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
-                                          usernameVariable: 'DH_USER',
-                                          passwordVariable: 'DH_PASS')]) {
+        sh 'mvn -B -q -DskipTests package'
+      }
+    }
+
+    stage('Build & Push Docker') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
           sh '''
             echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
-            docker push $DOCKER_IMAGE:$DOCKER_TAG
-            docker tag  $DOCKER_IMAGE:$DOCKER_TAG $DOCKER_IMAGE:latest
-            docker push $DOCKER_IMAGE:latest
+            docker buildx create --use --name jenx || docker buildx use jenx
+            docker buildx build --platform linux/amd64 -t ${DOCKER_IMG}:${IMAGE_TAG} -t ${DOCKER_IMG}:latest --push .
           '''
         }
       }
@@ -62,22 +41,23 @@ pipeline {
 
     stage('Deploy on EC2') {
       steps {
-        sshagent(['ec2-creds']) {
-          sh """
-            ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} '
-              docker rm -f hello || true &&
-              docker pull ${DOCKER_IMAGE}:${DOCKER_TAG} &&
-              docker run -d --name hello -p 9090:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}
+        withCredentials([sshUserPrivateKey(credentialsId: 'ec2-creds', keyFileVariable: 'EC2_KEY', usernameVariable: 'EC2_USER')]) {
+          sh '''
+            ssh -o StrictHostKeyChecking=no -i "$EC2_KEY" "$EC2_USER"@"${EC2_HOST}" '
+              set -e
+              docker pull ${DOCKER_IMG}:latest
+              docker rm -f ${APP_NAME} || true
+              docker run -d --name ${APP_NAME} -p 8080:8080 ${DOCKER_IMG}:latest
             '
-          """
+          '''
         }
       }
     }
   }
 
   post {
-    success {
-      echo "Deployed Successfully → http://${env.EC2_HOST}:9090/"
+    always {
+      echo "Build ${env.BUILD_NUMBER} finished with status: ${currentBuild.currentResult}"
     }
   }
 }
