@@ -7,6 +7,10 @@ pipeline {
     REGISTRY   = 'docker.io'
     DOCKER_IMG = "sahilsince2059/hello"
     EC2_HOST   = "ec2-3-145-131-238.us-east-2.compute.amazonaws.com"
+
+    // Add these two lines:
+    PATH       = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+    DOCKER_HOST = "unix:///Users/sahilbhusal/.docker/run/docker.sock"
   }
 
   tools {
@@ -15,25 +19,19 @@ pipeline {
   }
 
   stages {
-    stage('Checkout') {
-      steps {
-        git branch: 'main', url: 'https://github.com/itssahil2059/hello.git'
-      }
-    }
+    stage('Checkout') { steps { git branch: 'main', url: 'https://github.com/itssahil2059/hello.git' } }
 
-    stage('Build with Maven') {
-      steps {
-        sh 'mvn -B -q -DskipTests package'
-      }
-    }
+    stage('Build with Maven') { steps { sh 'mvn -B -q -DskipTests package' } }
 
     stage('Build & Push Docker') {
       steps {
+        sh 'docker version'                 // <— sanity check; leave it for now
         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
           sh '''
             echo "$DH_PASS" | docker login -u "$DH_USER" --password-stdin
             docker buildx create --use --name jenx || docker buildx use jenx
-            docker buildx build --platform linux/amd64 -t ${DOCKER_IMG}:${IMAGE_TAG} -t ${DOCKER_IMG}:latest --push .
+            docker buildx build --platform linux/amd64 \
+              -t ${DOCKER_IMG}:${IMAGE_TAG} -t ${DOCKER_IMG}:latest --push .
           '''
         }
       }
@@ -55,9 +53,5 @@ pipeline {
     }
   }
 
-  post {
-    always {
-      echo "Build ${env.BUILD_NUMBER} finished with status: ${currentBuild.currentResult}"
-    }
-  }
+  post { always { echo "Build ${env.BUILD_NUMBER} finished with status: ${currentBuild.currentResult}" } }
 }
