@@ -60,10 +60,15 @@ pipeline {
               echo 'Pulling image: ${DOCKER_IMG}:latest'; \
               docker pull ${DOCKER_IMG}:latest; \
               docker rm -f ${APP_NAME} || true; \
-              docker run -d --name ${APP_NAME} -p 8080:8080 ${DOCKER_IMG}:latest; \
+              docker run -d --name ${APP_NAME} --restart=always -p 8080:8080 ${DOCKER_IMG}:latest; \
               echo 'Running containers:'; \
               docker ps --format 'table {{.Names}}\\t{{.Image}}\\t{{.Ports}}' \
             "
+            echo " "
+            echo "=============================================================="
+            echo "✅ Deployed Successfully! Access the app here:"
+            echo "👉 http://${EC2_HOST}:8080/"
+            echo "=============================================================="
           """
         }
       }
