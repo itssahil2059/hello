@@ -36,19 +36,25 @@ pipeline {
       }
     }
 
-    stage('Test + Coverage') {
-      steps {
-        sh 'mvn -q clean verify jacoco:report'
+stage('Test + Coverage') {
+  steps {
+    sh 'mvn -q clean verify jacoco:report'
 
-        // Publish JaCoCo to Jenkins (no Jenkins-side thresholds)
-        publishCoverage adapters: [jacocoAdapter('target/site/jacoco/jacoco.xml')],
-                        sourceFileResolver: sourceFiles('STORE_LAST_BUILD'),
-                        failNoReports: true
+    publishCoverage(
+      adapters: [jacocoAdapter('target/site/jacoco/jacoco.xml')],
+      sourceFileResolver: sourceFiles('STORE_LAST_BUILD'),
+      failNoReports: true,
+      qualityGates: [[
+        threshold:   95.0,
+        metric:      'LINE_COVERAGE',
+        baseline:    'PROJECT',
+        criticality: 'FAILURE'
+      ]]
+    )
 
-        // Keep the HTML report as a build artifact (for screenshots)
-        archiveArtifacts artifacts: 'target/site/jacoco/**', fingerprint: true
-      }
-    }
+    archiveArtifacts artifacts: 'target/site/jacoco/**', fingerprint: true
+  }
+}
 
     stage('Build & Push Docker') {
       when { expression { return params.DEPLOY } }
