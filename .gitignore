@@ -3,3 +3,9 @@
 target/
 *.class
 *.log
+target/
+*.bak
+hello/
+target/
+*.bak
+hello/
