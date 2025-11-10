@@ -1,93 +1,114 @@
 package devops.demo;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.junit.jupiter.params.provider.Arguments.arguments;
-
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
-import org.junit.jupiter.api.*; // BeforeAll, BeforeEach, AfterEach, AfterAll, TestInstance, etc.
-import org.junit.jupiter.api.TestInstance.Lifecycle;
+import org.junit.jupiter.api.*; // @BeforeAll, etc.
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.*;
+import org.junit.jupiter.params.provider.*; // @CsvSource, @CsvFileSource, @MethodSource
 
-@TestInstance(Lifecycle.PER_CLASS)
 class CalculatorTest {
 
-    private final Calculator calc = new Calculator();
-    private static final String USER = "sahil";
+    private static final String USER = "sahilbhusal";
+    private static final AtomicInteger CASE_NO = new AtomicInteger(0);
+    private static String lastExpr = "";
+    private static String lastResult = "";
 
-    private final AtomicInteger counter = new AtomicInteger(0);
-    private final ThreadLocal<Integer> current = new ThreadLocal<>();
+    private final Calculator calc = new Calculator();
 
     @BeforeAll
-    void beforeAll() {
+    static void beforeAll() {
         System.out.println("[Before All] Calculator Test suite starting ... by " + USER);
     }
 
     @BeforeEach
-    void beforeEach(TestInfo info) {
-        int n = counter.incrementAndGet();
-        current.set(n);
-        System.out.println("[Before Each] Starting Test #" + n + ": " + info.getDisplayName() + " by " + USER);
+    void beforeEach() {
+        int n = CASE_NO.incrementAndGet();
+        System.out.println("[Before Each] Starting Test #" + n + ": " + lastExpr);
     }
 
     @AfterEach
-    void afterEach(TestInfo info) {
-        int n = current.get();
-        System.out.println("[After Each] Finished Test #" + n + ": " + info.getDisplayName() + " by " + USER);
-        current.remove();
+    void afterEach() {
+        int n = CASE_NO.get();
+        System.out.println("[After Each] Finished Test #" + n + ": " + lastResult);
+        lastExpr = "";
+        lastResult = "";
     }
 
     @AfterAll
-    void afterAll() {
-        System.out.println("[After All] completed " + counter.get() + " test invocations by " + USER + ".");
+    static void afterAll() {
+        System.out.println("[After All] completed " + CASE_NO.get() + " test invocations by " + USER + ".");
     }
 
-    // ---------- add: @MethodSource ----------
+    /* ---------- add(): @MethodSource ---------- */
     static Stream<Arguments> addData() {
         return Stream.of(
-            arguments(100,  2,  102),
-            arguments(100, -2,   98),
-            arguments(-100, 2,  -98),
-            arguments(-100,-2, -102)
+            Arguments.of(100,   2,  102),
+            Arguments.of(100,  -2,   98),
+            Arguments.of(-100,  2,  -98),
+            Arguments.of(-100, -2, -102)
         );
     }
 
-    @DisplayName("add(a,b)=expected")
-    @ParameterizedTest(name = "{index}: {0} + {1} = {2}")
+    @ParameterizedTest(name = "add {0} + {1} = {2}")
     @MethodSource("addData")
-    void add_works(int a, int b, int expected) {
-        assertEquals(expected, calc.add(a, b));
+    void add_two_numbers(int a, int b, int expected) {
+        lastExpr = a + " + " + b + " = " + expected;
+        int actual = calc.add(a, b);
+        lastResult = a + " + " + b + " = " + actual;
+        assertEquals(expected, actual);
     }
 
-    // ---------- substract: @CsvSource ----------
-    @DisplayName("substract(a,b)=expected")
-    @ParameterizedTest(name = "{index}: {0} - {1} = {2}")
+    /* ---------- substract(): @CsvSource ---------- */
+    @ParameterizedTest(name = "sub {0} - {1} = {2}")
     @CsvSource({
-        "100, 2,   98",
+        "100, 2, 98",
         "100, -2, 102",
         "-100, 2, -102",
         "-100, -2, -98"
     })
-    void substract_works(int a, int b, int expected) {
-        assertEquals(expected, calc.substract(a, b));
+    void subtract_two_numbers(int a, int b, int expected) {
+        lastExpr = a + " - " + b + " = " + expected;
+        int actual = calc.substract(a, b);
+        lastResult = a + " - " + b + " = " + actual;
+        assertEquals(expected, actual);
     }
 
-    // ---------- multiple: @CsvFileSource ----------
-    @DisplayName("multiple(a,b)=expected (from CSV)")
-    @ParameterizedTest(name = "{index}: {0} * {1} = {2}")
-    @CsvFileSource(resources = "/multiply.csv", numLinesToSkip = 1)
-    void multiple_works(int a, int b, int expected) {
-        assertEquals(expected, calc.multiple(a, b));
+    /* ---------- multiple(): @CsvFileSource ---------- */
+    @ParameterizedTest(name = "mul {0} * {1} = {2}")
+    @CsvFileSource(resources = "/multiply.csv", numLinesToSkip = 0)
+    void multiply_two_numbers(int a, int b, int expected) {
+        lastExpr = a + " * " + b + " = " + expected;
+        int actual = calc.multiple(a, b);
+        lastResult = a + " * " + b + " = " + actual;
+        assertEquals(expected, actual);
     }
 
-    // ---------- divide: one negative test ----------
+    /* ---------- divide(): cover BOTH branches + several happy paths ---------- */
     @Test
-    @DisplayName("divide by zero throws")
-    void divide_by_zero_throws() {
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> calc.divide(123, 0));
-        assertTrue(ex.getMessage().toLowerCase().contains("zero"));
+    @DisplayName("divide: throws on divide by zero (exception branch)")
+    void divide_throws_on_zero() {
+        lastExpr = "divide_byZero()";
+        assertThrows(IllegalArgumentException.class, () -> calc.divide(1, 0));
+        lastResult = "divide_byZero() threw IllegalArgumentException";
+    }
+
+    @Test
+    @DisplayName("divide: non-zero branch fully covered (sign combos)")
+    void divide_covers_nonzero_branch() {
+        assertEquals(50,  calc.divide(100,  2));
+        assertEquals(-50, calc.divide(100, -2));
+        assertEquals(-50, calc.divide(-100, 2));
+        assertEquals(50,  calc.divide(-100, -2));
+        lastResult = "non-zero divide paths covered";
+    }
+
+    /* ---------- optional: hit Calculator.main() for last-line coverage ---------- */
+    @Test
+    @DisplayName("main() runs (no-op) for coverage")
+    void main_runs() {
+        Calculator.main(new String[0]);
+        lastResult = "main() executed";
     }
 }
