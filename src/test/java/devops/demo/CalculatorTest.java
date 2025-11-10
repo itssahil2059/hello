@@ -77,7 +77,7 @@ class CalculatorTest {
 
     /* ---------- multiple(): @CsvFileSource ---------- */
     @ParameterizedTest(name = "mul {0} * {1} = {2}")
-    @CsvFileSource(resources = "/multiply.csv", numLinesToSkip = 0)
+    @CsvFileSource(resources = "/multiply.csv", numLinesToSkip = 1)
     void multiply_two_numbers(int a, int b, int expected) {
         lastExpr = a + " * " + b + " = " + expected;
         int actual = calc.multiple(a, b);
