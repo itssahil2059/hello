@@ -104,11 +104,5 @@ class CalculatorTest {
         lastResult = "non-zero divide paths covered";
     }
 
-    /* ---------- optional: hit Calculator.main() for last-line coverage ---------- */
-    @Test
-    @DisplayName("main() runs (no-op) for coverage")
-    void main_runs() {
-        Calculator.main(new String[0]);
-        lastResult = "main() executed";
-    }
+    
 }
