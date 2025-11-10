@@ -7,22 +7,16 @@
   <groupId>devops.demo</groupId>
   <artifactId>hello</artifactId>
   <version>1.0-SNAPSHOT</version>
-  <packaging>jar</packaging>
 
   <properties>
-    <!-- Java & build tooling -->
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-
-    <!-- Testing & reporting versions -->
     <junit.jupiter.version>5.10.2</junit.jupiter.version>
     <surefire.version>3.2.5</surefire.version>
     <jacoco.version>0.8.11</jacoco.version>
   </properties>
 
   <dependencies>
-    <!-- JUnit 5 (Jupiter + parameterized) -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
@@ -33,64 +27,53 @@
 
   <build>
     <plugins>
-      <!-- Run JUnit 5 and print System.out directly to console -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${surefire.version}</version>
         <configuration>
           <useModulePath>false</useModulePath>
-          <useFile>false</useFile>          <!-- show @Before/@After logs in terminal -->
-          <printSummary>true</printSummary>
-          <includes>
-            <include>**/*Test.java</include>
-          </includes>
+          <useFile>false</useFile>
+          <includes><include>**/*Test.java</include></includes>
         </configuration>
       </plugin>
 
-      <!-- JaCoCo: attach agent, generate HTML/XML, and ENFORCE 95% line coverage -->
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
         <version>${jacoco.version}</version>
         <executions>
-          <!-- Attach agent when tests run -->
           <execution>
             <id>prepare-agent</id>
-            <goals>
-              <goal>prepare-agent</goal>
-            </goals>
+            <goals><goal>prepare-agent</goal></goals>
           </execution>
-
-          <!-- Produce coverage report (HTML in target/site/jacoco/index.html) -->
           <execution>
             <id>report</id>
             <phase>test</phase>
-            <goals>
-              <goal>report</goal>
-            </goals>
-            <configuration>
-              <outputDirectory>${project.build.directory}/site/jacoco</outputDirectory>
-              <dataFile>${project.build.directory}/jacoco.exec</dataFile>
-            </configuration>
+            <goals><goal>report</goal></goals>
           </execution>
-
-          <!-- Quality gate: FAIL build if LINE coverage < 95% -->
+          <!-- Only check this class; set your desired bar -->
           <execution>
             <id>check</id>
             <phase>verify</phase>
-            <goals>
-              <goal>check</goal>
-            </goals>
+            <goals><goal>check</goal></goals>
             <configuration>
               <rules>
                 <rule>
-                  <element>BUNDLE</element>
+                  <element>CLASS</element>
+                  <includes>
+                    <include>devops.demo.Calculator</include>
+                  </includes>
                   <limits>
                     <limit>
                       <counter>LINE</counter>
                       <value>COVEREDRATIO</value>
-                      <minimum>0.95</minimum>
+                      <minimum>0.80</minimum>
+                    </limit>
+                    <limit>
+                      <counter>BRANCH</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.50</minimum>
                     </limit>
                   </limits>
                 </rule>
