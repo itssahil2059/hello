@@ -16,21 +16,48 @@ pipeline {
     jdk   'JDK21'
   }
 
+  options {
+    // We’ll do our own checkout stage.
+    skipDefaultCheckout(true)
+    // Keep build logs readable
+    ansiColor('xterm')
+  }
+
   stages {
 
     stage('Checkout') {
       steps {
-        git branch: 'main', url: 'https://github.com/itssahil2059/hello.git'
+        checkout([$class: 'GitSCM',
+          branches: [[name: '*/main']],
+          userRemoteConfigs: [[url: 'https://github.com/itssahil2059/hello.git']]
+        ])
       }
     }
 
-    stage('Build with Maven') {
+    // === NEW: publish JaCoCo to Jenkins + enforce Quality Gate in UI ===
+    stage('Test + Coverage') {
       steps {
-        sh 'mvn -B -q -DskipTests package'
+        sh 'mvn -q clean verify jacoco:report'
+
+        // Requires Jenkins "Coverage" plugin + "JaCoCo" adapter
+        publishCoverage adapters: [jacocoAdapter('target/site/jacoco/jacoco.xml')],
+          sourceFileResolver: sourceFiles('STORE_LAST_BUILD'),
+          failOnError: true,
+          globalThresholds: [
+            // Match your assignment: Line >= 95% (gate)
+            [thresholdTarget: 'Line',   unhealthyThreshold: '95', unstableThreshold: '95'],
+            // Branch gate optional (kept moderate)
+            [thresholdTarget: 'Branch', unhealthyThreshold: '50', unstableThreshold: '50']
+          ]
+
+        // Archive HTML report so you can click into it from Jenkins
+        archiveArtifacts artifacts: 'target/site/jacoco/**', fingerprint: true
       }
     }
 
+    // Keep your Docker build & deploy, but make them optional (skip for the quiz)
     stage('Build & Push Docker') {
+      when { expression { return params.DEPLOY?.toBoolean() } }
       steps {
         withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
           sh '''
@@ -51,6 +78,7 @@ pipeline {
     }
 
     stage('Deploy on EC2') {
+      when { expression { return params.DEPLOY?.toBoolean() } }
       steps {
         withCredentials([sshUserPrivateKey(credentialsId: 'ec2-creds', keyFileVariable: 'EC2_KEY', usernameVariable: 'EC2_USER')]) {
           sh """
@@ -79,5 +107,9 @@ pipeline {
     always {
       echo "Build ${env.BUILD_NUMBER} finished with status: ${currentBuild.currentResult}"
     }
+  }
+
+  parameters {
+    booleanParam(name: 'DEPLOY', defaultValue: false, description: 'Build & deploy Docker image to EC2 (not required for the quiz)')
   }
 }
