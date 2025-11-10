@@ -4,88 +4,100 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <!-- Spring Boot parent gives sane plugin/config defaults -->
-  <parent>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.3.4</version>
-    <relativePath/>
-  </parent>
-
   <groupId>devops.demo</groupId>
   <artifactId>hello</artifactId>
-  <version>1.0.0</version>
+  <version>1.0-SNAPSHOT</version>
   <packaging>jar</packaging>
-  <name>hello</name>
-  <description>Hello Spring Boot app</description>
 
   <properties>
-<<<<<<< HEAD
-    <java.version>21</java.version>
-  </properties>
-
-  <dependencies>
-    <!-- Web starter -> embedded Tomcat + JSON + Spring MVC -->
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-web</artifactId>
-    </dependency>
-
-    <!-- (Optional) for nice actuator health at /actuator/health -->
-    <!--
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-actuator</artifactId>
-    </dependency>
-    -->
-=======
+    <!-- Java & build tooling -->
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
+    <!-- Testing & reporting versions -->
     <junit.jupiter.version>5.10.2</junit.jupiter.version>
     <surefire.version>3.2.5</surefire.version>
+    <jacoco.version>0.8.11</jacoco.version>
   </properties>
 
   <dependencies>
+    <!-- JUnit 5 (Jupiter + parameterized) -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
       <version>${junit.jupiter.version}</version>
       <scope>test</scope>
     </dependency>
->>>>>>> 51b6118 (Lab7: add JaCoCo + tests + gitignore)
   </dependencies>
 
   <build>
     <plugins>
-<<<<<<< HEAD
-      <!-- This "repackages" target/*.jar into an executable jar with Main-Class -->
-      <plugin>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>repackage</goal>
-            </goals>
-          </execution>
-        </executions>
-=======
-      <!-- JUnit 5 + print System.out directly in terminal -->
+      <!-- Run JUnit 5 and print System.out directly to console -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${surefire.version}</version>
         <configuration>
           <useModulePath>false</useModulePath>
-          <useFile>false</useFile>
+          <useFile>false</useFile>          <!-- show @Before/@After logs in terminal -->
           <printSummary>true</printSummary>
           <includes>
             <include>**/*Test.java</include>
           </includes>
         </configuration>
->>>>>>> 51b6118 (Lab7: add JaCoCo + tests + gitignore)
+      </plugin>
+
+      <!-- JaCoCo: attach agent, generate HTML/XML, and ENFORCE 95% line coverage -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco.version}</version>
+        <executions>
+          <!-- Attach agent when tests run -->
+          <execution>
+            <id>prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+
+          <!-- Produce coverage report (HTML in target/site/jacoco/index.html) -->
+          <execution>
+            <id>report</id>
+            <phase>test</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/site/jacoco</outputDirectory>
+              <dataFile>${project.build.directory}/jacoco.exec</dataFile>
+            </configuration>
+          </execution>
+
+          <!-- Quality gate: FAIL build if LINE coverage < 95% -->
+          <execution>
+            <id>check</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.95</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
