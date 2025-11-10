@@ -7,8 +7,9 @@ pipeline {
     DOCKER_IMG  = 'sahilsince2059/hello'
     EC2_HOST    = 'ec2-3-145-131-238.us-east-2.compute.amazonaws.com'
 
-    PATH        = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-    DOCKER_HOST = "unix:///Users/sahilbhusal/.docker/run/docker.sock"
+    PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+    // Tip: leave DOCKER_HOST unset so the agent’s default socket/context is used
+    // DOCKER_HOST = "unix:///Users/sahilbhusal/.docker/run/docker.sock"
   }
 
   tools {
@@ -16,15 +17,23 @@ pipeline {
     jdk   'JDK21'
   }
 
+  parameters {
+    booleanParam(
+      name: 'DEPLOY',
+      defaultValue: false,
+      description: 'Build & deploy Docker image to EC2 (not required for the quiz)'
+    )
+  }
+
   options {
-    // We’ll do our own checkout stage.
+    // we do our own checkout
     skipDefaultCheckout(true)
-    // Keep build logs readable
-    ansiColor('xterm')
+    // safe, built-in options:
+    timestamps()
+    buildDiscarder(logRotator(numToKeepStr: '15'))
   }
 
   stages {
-
     stage('Checkout') {
       steps {
         checkout([$class: 'GitSCM',
@@ -34,28 +43,24 @@ pipeline {
       }
     }
 
-    // === NEW: publish JaCoCo to Jenkins + enforce Quality Gate in UI ===
     stage('Test + Coverage') {
       steps {
         sh 'mvn -q clean verify jacoco:report'
 
-        // Requires Jenkins "Coverage" plugin + "JaCoCo" adapter
+        // Requires Jenkins "Coverage" plugin (and its built-in JaCoCo adapter)
         publishCoverage adapters: [jacocoAdapter('target/site/jacoco/jacoco.xml')],
           sourceFileResolver: sourceFiles('STORE_LAST_BUILD'),
           failOnError: true,
           globalThresholds: [
-            // Match your assignment: Line >= 95% (gate)
             [thresholdTarget: 'Line',   unhealthyThreshold: '95', unstableThreshold: '95'],
-            // Branch gate optional (kept moderate)
             [thresholdTarget: 'Branch', unhealthyThreshold: '50', unstableThreshold: '50']
           ]
 
-        // Archive HTML report so you can click into it from Jenkins
+        // Archive the HTML report so you can click it from the build
         archiveArtifacts artifacts: 'target/site/jacoco/**', fingerprint: true
       }
     }
 
-    // Keep your Docker build & deploy, but make them optional (skip for the quiz)
     stage('Build & Push Docker') {
       when { expression { return params.DEPLOY?.toBoolean() } }
       steps {
@@ -92,7 +97,7 @@ pipeline {
               echo 'Running containers:'; \
               docker ps --format 'table {{.Names}}\\t{{.Image}}\\t{{.Ports}}' \
             "
-            echo " "
+            echo
             echo "=============================================================="
             echo "✅ Deployed Successfully! Access the app here:"
             echo "👉 http://${EC2_HOST}:8080/"
@@ -107,9 +112,5 @@ pipeline {
     always {
       echo "Build ${env.BUILD_NUMBER} finished with status: ${currentBuild.currentResult}"
     }
-  }
-
-  parameters {
-    booleanParam(name: 'DEPLOY', defaultValue: false, description: 'Build & deploy Docker image to EC2 (not required for the quiz)')
   }
 }
